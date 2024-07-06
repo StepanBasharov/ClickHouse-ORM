@@ -1,4 +1,4 @@
-from clickhouse_orm.model import Model
+from clickhouse_orm.models import Model
 from clickhouse_orm.core.connector import ClickHouseConnector
 
 
@@ -12,5 +12,8 @@ ch = ClickHouseConnector(
     password="test"
 )
 
-print(ch.all(User, "name", "age", "sex", "lex", "dex"))
+try:
+    print(ch.all(User, "name", "id", "age"))
+except Exception as e:
+    print(str(e))
 

@@ -1,0 +1,6 @@
+class Field:
+    ...
+
+
+class IntField(Field):
+    ...

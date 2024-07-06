@@ -1,8 +1,9 @@
 from typing import Type
 
 import requests
+from requests import Response
 
-from clickhouse_orm.model import Model
+from clickhouse_orm.models import Model
 from clickhouse_orm.core.decorators import error_handler
 
 
@@ -23,10 +24,10 @@ class ClickHouseConnector:
         self.password = password
         self.use_tls = use_tls
         self.headers: dict = dict()
-        self.dsn = None
-        self._build_dsn()
+        self.dsn = self._build_dsn()
 
-    def _build_dsn(self):
+    def _build_dsn(self) -> str:
+        """ Создать интерфейс соединения с базой данных """
         if self.use_tls:
             dsn = f"https://{self.host}:{self.port}"
         else:
@@ -38,15 +39,17 @@ class ClickHouseConnector:
             self.headers['X-ClickHouse-Key'] = self.password
         self.headers['X-ClickHouse-Database'] = self.database
 
-        self.dsn = dsn
-
-    def _commit(self, query: str):
-        url = f"{self.dsn}/?query={query}"
-        ch_response = requests.get(url=url, headers=self.headers)
-        return ch_response.text.split("\n")
+        return dsn
 
     @error_handler
+    def _commit(self, query: str) -> Response:
+        """ Отправить запрос базе """
+        url = f"{self.dsn}/?query={query}"
+        ch_response = requests.get(url=url, headers=self.headers)
+        return ch_response
+
     def all(self, model: Type[Model], *args):
+        """ Получить все записи таблицы"""
         columns = []
         if len(args) > 0:
             for column in args:
