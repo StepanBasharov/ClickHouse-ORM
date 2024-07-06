@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  clickhouse:
+    image: yandex/clickhouse-server:latest
+    container_name: clickhouse-server
+    ports:
+      - "8123:8123"  # HTTP интерфейс
+      - "9000:9000"  # Native интерфейс
+      - "9009:9009"  # интерфейс для интерконнекта
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_DB=test
+      - CLICKHOUSE_USER=test
+      - CLICKHOUSE_PASSWORD=test
+
+volumes:
+  clickhouse_data:
