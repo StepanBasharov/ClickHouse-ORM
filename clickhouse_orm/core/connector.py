@@ -1,8 +1,12 @@
+import json
+from copy import copy
+from json import JSONDecodeError
 from typing import Type
 
 import requests
 from requests import Response
 
+from clickhouse_orm.fields import IntField, Field
 from clickhouse_orm.models import Model
 from clickhouse_orm.core.decorators import error_handler
 
@@ -27,7 +31,7 @@ class ClickHouseConnector:
         self.dsn = self._build_dsn()
 
     def _build_dsn(self) -> str:
-        """ Создать интерфейс соединения с базой данных """
+        """ Create Interface for connection to ClickHouse """
         if self.use_tls:
             dsn = f"https://{self.host}:{self.port}"
         else:
@@ -43,19 +47,46 @@ class ClickHouseConnector:
 
     @error_handler
     def _commit(self, query: str) -> Response:
-        """ Отправить запрос базе """
+        """ Create Commit to Database """
         url = f"{self.dsn}/?query={query}"
         ch_response = requests.get(url=url, headers=self.headers)
         return ch_response
 
-    def all(self, model: Type[Model], *args):
-        """ Получить все записи таблицы"""
+    def _remove_python_vars(self, python_vars: dict):
+        python_vars.pop("__table__")
+        python_vars.pop("__doc__")
+        return python_vars
+
+    def all(self, model: Type[Model], *args) -> list:
+        """
+        Get all objects from table
+        model: table model class
+        *args: fields for get
+        """
+        objects = []
         columns = []
         if len(args) > 0:
             for column in args:
                 columns.append(column)
         if len(columns) > 0:
-            query = f"SELECT {", ".join(columns)} FROM {model.__table__};"
+            query = f"SELECT {", ".join(columns)} FROM {model.__table__} FORMAT JSONEachRow;"
         else:
-            query = f"SELECT * FROM {model.__table__};"
-        return self._commit(query=query)
+            query = f"SELECT * FROM {model.__table__} FORMAT JSONEachRow;"
+        rows = self._commit(query=query)
+        for row in rows:
+            row = row.replace("'", "\"")
+            try:
+                row = json.loads(row)
+            except JSONDecodeError:
+                continue
+            new_model = model()
+            fields = self._remove_python_vars(dict(vars(model)))
+            for key in row:
+                data: Field = fields[key]
+                data = copy(data)
+                data.to_python_type(row[key])
+                setattr(new_model, key, data)
+
+            objects.append(new_model)
+
+        return objects
